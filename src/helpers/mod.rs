@@ -60,6 +60,8 @@ pub type HelperResult = Result<(), RenderError>;
 ///         .map(|t| t.render(r, ctx, rc, out))
 ///         .unwrap_or(Ok(()))
 /// }
+/// let mut hbs = Handlebars::new();
+/// hbs.register_helper("dummy", Box::new(dummy_block));
 /// ```
 ///
 /// ## Define helper function using macro

@@ -55,6 +55,7 @@ pub fn no_escape(data: &str) -> String {
 /// The single entry point of your Handlebars templates
 ///
 /// It maintains compiled templates and registered helpers.
+/// This type is publicly exported under the name `Handlebars`.
 #[derive(Clone)]
 pub struct Registry<'reg> {
     templates: HashMap<String, Template>,
