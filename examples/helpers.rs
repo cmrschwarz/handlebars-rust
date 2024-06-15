@@ -1,6 +1,9 @@
 use std::error::Error;
 
-use handlebars::{handlebars_helper, Handlebars, JsonRender};
+use handlebars::{
+    handlebars_helper, Context, Handlebars, Helper, JsonRender, Output, RenderContext, RenderError,
+    RenderErrorReason, Renderable,
+};
 use serde_json::{json, Value};
 use time::format_description::parse;
 use time::OffsetDateTime;
@@ -24,6 +27,35 @@ handlebars_helper!(date2: |dt: OffsetDateTime, {fmt:str = "[year]-[month]-[day]"
     dt.format(&parse(fmt).unwrap()).unwrap()
 );
 
+// a custom block helper to repeat a block n times
+fn helper_repeat<'reg, 'rc>(
+    h: &Helper<'rc>,
+    r: &'reg Handlebars<'reg>,
+    ctx: &'rc Context,
+    rc: &mut RenderContext<'reg, 'rc>,
+    out: &mut dyn Output,
+) -> Result<(), RenderError> {
+    let count = h.param(0).as_ref().and_then(|v| v.value().as_u64()).ok_or(
+        RenderErrorReason::ParamTypeMismatchForName(
+            "repeat",
+            "count".to_string(),
+            "u64".to_string(),
+        ),
+    )?;
+
+    let template = h
+        .template()
+        .ok_or(RenderErrorReason::BlockContentRequired)?;
+
+    for _ in 0..count {
+        template.render(r, ctx, rc, out)?;
+    }
+
+    rc.pop_block();
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     // create the handlebars registry
     let mut handlebars = Handlebars::new();
@@ -33,6 +65,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     handlebars.register_helper("nargs", Box::new(nargs));
     handlebars.register_helper("join", Box::new(join));
     handlebars.register_helper("isdefined", Box::new(isdefined));
+
+    handlebars.register_helper("repeat", Box::new(helper_repeat));
 
     let data = OffsetDateTime::now_utc();
 
@@ -48,6 +82,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!(
         "{}",
         handlebars.render_template("{{join 1 2 3 4 sep=\"|\" }}", &())?
+    );
+
+    println!(
+        "{}",
+        handlebars.render_template(
+            "
+{{#repeat 3}}
+<p>{{foo}}</p>
+{{/repeat}}
+"
+            .trim(),
+            &json!({"foo": "bar"})
+        )?
     );
 
     println!(
