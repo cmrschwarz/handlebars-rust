@@ -1,0 +1,33 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "integration tests",
+            "sourceLanguages": [
+                "rust"
+            ],
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--tests",
+                ],
+                "filter": {
+                    "kind": "test",
+                    "name": "whitespace", // name of the test file, default is "mod"
+                }
+            },
+            "args": [
+                "--test-threads=1",
+                //"--exact",
+                "--nocapture",
+                //modify test name
+                "test_partial_inside_if",
+                // "unset_field_value"
+            ],
+            "cwd": "${workspaceFolder}",
+        },
+    ],
+}

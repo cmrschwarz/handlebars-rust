@@ -87,3 +87,41 @@ fn test_partial_inside_if() {
         output
     );
 }
+
+#[test]
+fn test_partial_inside_if_2() {
+    let input = r#"
+{{#*inline "nested_partial"}}
+<div>
+    foobar
+</div>
+{{/inline}}
+{{#*inline "partial"}}
+<div>
+    {{#if foo}}
+    {{#if foo}}
+    {{> nested_partial}}
+    {{/if}}
+    {{/if}}
+</div>
+{{/inline}}
+<div>
+    {{>partial}}
+</div>
+"#;
+    let output = "
+<div>
+    <div>
+        <div>
+            foobar
+        </div>
+    </div>
+</div>
+";
+    let hbs = Handlebars::new();
+
+    assert_eq!(
+        hbs.render_template(input, &json!({"foo": true})).unwrap(),
+        output
+    );
+}
