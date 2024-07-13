@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::convert::AsRef;
 use std::fmt::{self, Debug, Formatter};
@@ -57,11 +56,11 @@ pub fn no_escape(data: &str) -> String {
 ///
 /// It maintains compiled templates and registered helpers.
 #[derive(Clone)]
-pub struct Registry<'reg> {
-    templates: HashMap<String, Template>,
+pub struct Registry {
+    templates: HashMap<String, Arc<Template>>,
 
-    helpers: HashMap<String, Arc<dyn HelperDef + Send + Sync + 'reg>>,
-    decorators: HashMap<String, Arc<dyn DecoratorDef + Send + Sync + 'reg>>,
+    helpers: HashMap<String, Arc<dyn HelperDef + Send + Sync>>,
+    decorators: HashMap<String, Arc<dyn DecoratorDef + Send + Sync>>,
 
     escape_fn: EscapeFn,
     strict_mode: bool,
@@ -71,13 +70,12 @@ pub struct Registry<'reg> {
     pub(crate) engine: Arc<Engine>,
 
     template_sources:
-        HashMap<String, Arc<dyn Source<Item = String, Error = IoError> + Send + Sync + 'reg>>,
+        HashMap<String, Arc<dyn Source<Item = String, Error = IoError> + Send + Sync>>,
     #[cfg(feature = "script_helper")]
-    script_sources:
-        HashMap<String, Arc<dyn Source<Item = String, Error = IoError> + Send + Sync + 'reg>>,
+    script_sources: HashMap<String, Arc<dyn Source<Item = String, Error = IoError> + Send + Sync>>,
 }
 
-impl<'reg> Debug for Registry<'reg> {
+impl Debug for Registry {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("Handlebars")
             .field("templates", &self.templates)
@@ -89,7 +87,7 @@ impl<'reg> Debug for Registry<'reg> {
     }
 }
 
-impl<'reg> Default for Registry<'reg> {
+impl Default for Registry {
     fn default() -> Self {
         Self::new()
     }
@@ -140,8 +138,8 @@ impl Default for DirectorySourceOptions {
     }
 }
 
-impl<'reg> Registry<'reg> {
-    pub fn new() -> Registry<'reg> {
+impl Registry {
+    pub fn new() -> Registry {
         let r = Registry {
             templates: HashMap::new(),
             template_sources: HashMap::new(),
@@ -160,7 +158,7 @@ impl<'reg> Registry<'reg> {
         r.setup_builtins()
     }
 
-    fn setup_builtins(mut self) -> Registry<'reg> {
+    fn setup_builtins(mut self) -> Registry {
         self.register_helper("if", Box::new(helpers::IF_HELPER));
         self.register_helper("unless", Box::new(helpers::UNLESS_HELPER));
         self.register_helper("each", Box::new(helpers::EACH_HELPER));
@@ -255,7 +253,7 @@ impl<'reg> Registry<'reg> {
     /// Dev mode doesn't apply for pre-compiled template because it's lifecycle
     /// is not managed by the registry.
     pub fn register_template(&mut self, name: &str, tpl: Template) {
-        self.templates.insert(name.to_string(), tpl);
+        self.templates.insert(name.to_string(), Arc::new(tpl));
     }
 
     /// Register a template string
@@ -272,9 +270,9 @@ impl<'reg> Registry<'reg> {
         let template = Template::compile2(
             tpl_str.as_ref(),
             TemplateOptions {
-                name: Some(name.to_owned()),
-                is_partial: false,
+                name: Some(name.into()),
                 prevent_indent: self.prevent_indent,
+                is_partial: false,
             },
         )?;
         self.register_template(name, template);
@@ -471,7 +469,7 @@ impl<'reg> Registry<'reg> {
     }
 
     /// Register a helper
-    pub fn register_helper(&mut self, name: &str, def: Box<dyn HelperDef + Send + Sync + 'reg>) {
+    pub fn register_helper(&mut self, name: &str, def: Box<dyn HelperDef + Send + Sync>) {
         self.helpers.insert(name.to_string(), def.into());
     }
 
@@ -544,11 +542,7 @@ impl<'reg> Registry<'reg> {
     }
 
     /// Register a decorator
-    pub fn register_decorator(
-        &mut self,
-        name: &str,
-        def: Box<dyn DecoratorDef + Send + Sync + 'reg>,
-    ) {
+    pub fn register_decorator(&mut self, name: &str, def: Box<dyn DecoratorDef + Send + Sync>) {
         self.decorators.insert(name.to_string(), def.into());
     }
 
@@ -577,14 +571,14 @@ impl<'reg> Registry<'reg> {
 
     /// Return a registered template,
     pub fn get_template(&self, name: &str) -> Option<&Template> {
-        self.templates.get(name)
+        self.templates.get(name).map(|t| &**t)
     }
 
     #[inline]
     pub(crate) fn get_or_load_template_optional(
-        &'reg self,
+        &self,
         name: &str,
-    ) -> Option<Result<Cow<'reg, Template>, RenderError>> {
+    ) -> Option<Result<Arc<Template>, RenderError>> {
         if let (true, Some(source)) = (self.dev_mode, self.template_sources.get(name)) {
             let r = source
                 .load()
@@ -593,25 +587,22 @@ impl<'reg> Registry<'reg> {
                     Template::compile2(
                         tpl_str.as_ref(),
                         TemplateOptions {
-                            name: Some(name.to_owned()),
+                            name: Some(name.into()),
                             prevent_indent: self.prevent_indent,
                             is_partial: false,
                         },
                     )
+                    .map(Arc::new)
                 })
-                .map(Cow::Owned)
                 .map_err(RenderError::from);
             Some(r)
         } else {
-            self.templates.get(name).map(|t| Ok(Cow::Borrowed(t)))
+            self.templates.get(name).map(|t| Ok(t.clone()))
         }
     }
 
     #[inline]
-    pub(crate) fn get_or_load_template(
-        &'reg self,
-        name: &str,
-    ) -> Result<Cow<'reg, Template>, RenderError> {
+    pub(crate) fn get_or_load_template(&self, name: &str) -> Result<Arc<Template>, RenderError> {
         if let Some(result) = self.get_or_load_template_optional(name) {
             result
         } else {
@@ -622,9 +613,9 @@ impl<'reg> Registry<'reg> {
     /// Return a registered helper
     #[inline]
     pub(crate) fn get_or_load_helper(
-        &'reg self,
+        &self,
         name: &str,
-    ) -> Result<Option<Arc<dyn HelperDef + Send + Sync + 'reg>>, RenderError> {
+    ) -> Result<Option<Arc<dyn HelperDef + Send + Sync>>, RenderError> {
         #[cfg(feature = "script_helper")]
         if let (true, Some(source)) = (self.dev_mode, self.script_sources.get(name)) {
             return source
@@ -649,11 +640,8 @@ impl<'reg> Registry<'reg> {
 
     /// Return a registered decorator
     #[inline]
-    pub(crate) fn get_decorator(
-        &self,
-        name: &str,
-    ) -> Option<&(dyn DecoratorDef + Send + Sync + 'reg)> {
-        self.decorators.get(name).map(AsRef::as_ref)
+    pub(crate) fn get_decorator(&self, name: &str) -> Option<&(dyn DecoratorDef + Send + Sync)> {
+        self.decorators.get(name).map(|v| v.as_ref())
     }
 
     /// Return all templates registered
@@ -661,7 +649,7 @@ impl<'reg> Registry<'reg> {
     /// **Note that** in dev mode, the template returned from this method may
     /// not reflect its latest state. This method doesn't try to reload templates
     /// from its source.
-    pub fn get_templates(&self) -> &HashMap<String, Template> {
+    pub fn get_templates(&self) -> &HashMap<String, Arc<Template>> {
         &self.templates
     }
 
@@ -682,7 +670,7 @@ impl<'reg> Registry<'reg> {
         O: Output,
     {
         self.get_or_load_template(name).and_then(|t| {
-            let mut render_context = RenderContext::new(t.name.as_ref());
+            let mut render_context = RenderContext::new(t.name.clone());
             t.render(self, ctx, &mut render_context, output)
         })
     }
@@ -846,12 +834,12 @@ mod test {
     struct DummyHelper;
 
     impl HelperDef for DummyHelper {
-        fn call<'reg: 'rc, 'rc>(
+        fn call(
             &self,
-            h: &Helper<'rc>,
-            r: &'reg Registry<'reg>,
-            ctx: &'rc Context,
-            rc: &mut RenderContext<'reg, 'rc>,
+            h: &Helper<'_>,
+            r: &Registry,
+            ctx: &Context,
+            rc: &mut RenderContext,
             out: &mut dyn Output,
         ) -> Result<(), RenderError> {
             h.template().unwrap().render(r, ctx, rc, out)
@@ -1193,13 +1181,13 @@ mod test {
     use crate::json::value::ScopedJson;
     struct GenMissingHelper;
     impl HelperDef for GenMissingHelper {
-        fn call_inner<'reg: 'rc, 'rc>(
+        fn call_inner<'a>(
             &self,
-            _: &Helper<'rc>,
-            _: &'reg Registry<'reg>,
-            _: &'rc Context,
-            _: &mut RenderContext<'reg, 'rc>,
-        ) -> Result<ScopedJson<'rc>, RenderError> {
+            _: &Helper<'a>,
+            _: &Registry,
+            _: &Context,
+            _: &mut RenderContext,
+        ) -> Result<ScopedJson<'a>, RenderError> {
             Ok(ScopedJson::Missing)
         }
     }
@@ -1213,9 +1201,9 @@ mod test {
             "check_missing",
             Box::new(
                 |h: &Helper<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  _: &Context,
-                 _: &mut RenderContext<'_, '_>,
+                 _: &mut RenderContext,
                  _: &mut dyn Output|
                  -> Result<(), RenderError> {
                     let value = h.param(0).unwrap();

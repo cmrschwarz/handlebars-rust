@@ -89,13 +89,13 @@ fn invalid_json_path() {
 struct MyHelper;
 
 impl HelperDef for MyHelper {
-    fn call_inner<'reg: 'rc, 'rc>(
+    fn call_inner<'a>(
         &self,
-        _: &Helper<'rc>,
-        _: &'reg Handlebars,
-        _: &'rc Context,
-        _: &mut RenderContext<'reg, 'rc>,
-    ) -> Result<ScopedJson<'rc>, RenderError> {
+        _: &Helper<'a>,
+        _: &'a Handlebars,
+        _: &'a Context,
+        _: &mut RenderContext,
+    ) -> Result<ScopedJson<'a>, RenderError> {
         Ok(ScopedJson::Derived(json!({
             "a": 1,
             "b": 2,
@@ -121,13 +121,13 @@ struct CallCounterHelper {
 }
 
 impl HelperDef for CallCounterHelper {
-    fn call_inner<'reg: 'rc, 'rc>(
+    fn call_inner<'a>(
         &self,
-        h: &Helper<'rc>,
-        _: &'reg Handlebars,
-        _: &'rc Context,
-        _: &mut RenderContext<'reg, 'rc>,
-    ) -> Result<ScopedJson<'rc>, RenderError> {
+        h: &Helper<'a>,
+        _: &Handlebars,
+        _: &Context,
+        _: &mut RenderContext,
+    ) -> Result<ScopedJson<'a>, RenderError> {
         // inc counter
         self.c.fetch_add(1, Ordering::SeqCst);
 

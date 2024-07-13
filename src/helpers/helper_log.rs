@@ -17,12 +17,12 @@ pub struct LogHelper;
 
 #[cfg(not(feature = "no_logging"))]
 impl HelperDef for LogHelper {
-    fn call<'reg: 'rc, 'rc>(
+    fn call(
         &self,
-        h: &Helper<'rc>,
-        _: &'reg Registry<'reg>,
-        _: &'rc Context,
-        _: &mut RenderContext<'reg, 'rc>,
+        h: &Helper<'_>,
+        _: &Registry,
+        _: &Context,
+        _: &mut RenderContext,
         _: &mut dyn Output,
     ) -> HelperResult {
         let param_to_log = h
@@ -57,9 +57,9 @@ impl HelperDef for LogHelper {
     fn call<'reg: 'rc, 'rc>(
         &self,
         _: &Helper<'rc>,
-        _: &Registry<'reg>,
+        _: &Registry,
         _: &Context,
-        _: &mut RenderContext<'reg, 'rc>,
+        _: &mut RenderContext,
         _: &mut dyn Output,
     ) -> HelperResult {
         Ok(())

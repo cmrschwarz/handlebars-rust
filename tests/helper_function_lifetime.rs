@@ -1,10 +1,10 @@
 use handlebars::*;
 
-fn ifcond<'reg, 'rc>(
+fn ifcond<'rc>(
     h: &Helper<'rc>,
-    handle: &'reg Handlebars,
+    handle: &Handlebars,
     ctx: &'rc Context,
-    render_ctx: &mut RenderContext<'reg, 'rc>,
+    render_ctx: &mut RenderContext,
     out: &mut dyn Output,
 ) -> Result<(), RenderError> {
     let cond = h.param(0).and_then(|v| v.value().as_bool()).ok_or(

@@ -13,7 +13,7 @@ use crate::util::copy_on_push_vec;
 use crate::RenderErrorReason;
 
 fn update_block_context(
-    block: &mut BlockContext<'_>,
+    block: &mut BlockContext,
     base_path: Option<&Vec<String>>,
     relative_path: String,
     is_first: bool,
@@ -30,9 +30,9 @@ fn update_block_context(
     }
 }
 
-fn set_block_param<'rc>(
-    block: &mut BlockContext<'rc>,
-    h: &Helper<'rc>,
+fn set_block_param(
+    block: &mut BlockContext,
+    h: &Helper<'_>,
     base_path: Option<&Vec<String>>,
     k: &Json,
     v: &Json,
@@ -40,20 +40,20 @@ fn set_block_param<'rc>(
     if let Some(bp_val) = h.block_param() {
         let mut params = BlockParams::new();
         if base_path.is_some() {
-            params.add_path(bp_val, Vec::with_capacity(0))?;
+            params.add_path(bp_val.to_owned(), Vec::with_capacity(0))?;
         } else {
-            params.add_value(bp_val, v.clone())?;
+            params.add_value(bp_val.to_owned(), v.clone())?;
         }
 
         block.set_block_params(params);
     } else if let Some((bp_val, bp_key)) = h.block_param_pair() {
         let mut params = BlockParams::new();
         if base_path.is_some() {
-            params.add_path(bp_val, Vec::with_capacity(0))?;
+            params.add_path(bp_val.to_owned(), Vec::with_capacity(0))?;
         } else {
-            params.add_value(bp_val, v.clone())?;
+            params.add_value(bp_val.to_owned(), v.clone())?;
         }
-        params.add_value(bp_key, k.clone())?;
+        params.add_value(bp_key.to_owned(), k.clone())?;
 
         block.set_block_params(params);
     }
@@ -65,12 +65,12 @@ fn set_block_param<'rc>(
 pub struct EachHelper;
 
 impl HelperDef for EachHelper {
-    fn call<'reg: 'rc, 'rc>(
+    fn call(
         &self,
-        h: &Helper<'rc>,
-        r: &'reg Registry<'reg>,
-        ctx: &'rc Context,
-        rc: &mut RenderContext<'reg, 'rc>,
+        h: &Helper<'_>,
+        r: &Registry,
+        ctx: &Context,
+        rc: &mut RenderContext,
         out: &mut dyn Output,
     ) -> HelperResult {
         let value = h

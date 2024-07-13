@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
         .unwrap_err();
     // get nested error to from `RenderError`
     if let Some(HelperError::DbError) = e2.source().and_then(|e| e.downcast_ref::<HelperError>()) {
-        println!("Detected error from helper: db error",);
+        println!("Detected error from helper: db error",)
     }
 
     Ok(())

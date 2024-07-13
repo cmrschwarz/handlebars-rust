@@ -25,25 +25,25 @@ impl BlockParamHolder {
 
 /// A map holds block parameters. The parameter can be either a value or a reference
 #[derive(Clone, Debug, Default)]
-pub struct BlockParams<'reg> {
-    data: BTreeMap<&'reg str, BlockParamHolder>,
+pub struct BlockParams {
+    data: BTreeMap<String, BlockParamHolder>,
 }
 
-impl<'reg> BlockParams<'reg> {
+impl BlockParams {
     /// Create a empty block parameter map.
-    pub fn new() -> BlockParams<'reg> {
+    pub fn new() -> BlockParams {
         BlockParams::default()
     }
 
     /// Add a path reference as the parameter. The `path` is a vector of path
     /// segments the relative to current block's base path.
-    pub fn add_path(&mut self, k: &'reg str, path: Vec<String>) -> Result<(), RenderError> {
+    pub fn add_path(&mut self, k: String, path: Vec<String>) -> Result<(), RenderError> {
         self.data.insert(k, BlockParamHolder::path(path));
         Ok(())
     }
 
     /// Add a value as parameter.
-    pub fn add_value(&mut self, k: &'reg str, v: Json) -> Result<(), RenderError> {
+    pub fn add_value(&mut self, k: String, v: Json) -> Result<(), RenderError> {
         self.data.insert(k, BlockParamHolder::value(v));
         Ok(())
     }
@@ -56,21 +56,21 @@ impl<'reg> BlockParams<'reg> {
 
 /// A data structure holds contextual data for current block scope.
 #[derive(Debug, Clone, Default)]
-pub struct BlockContext<'rc> {
-    /// the `base_path` of current block scope
+pub struct BlockContext {
+    /// the base_path of current block scope
     base_path: Vec<String>,
     /// the `base_value` of current block scope, when the block is using a
     /// constant or derived value as block base
     base_value: Option<Json>,
     /// current block context variables
-    block_params: BlockParams<'rc>,
+    block_params: BlockParams,
     /// local variables in current context
     local_variables: LocalVars,
 }
 
-impl<'rc> BlockContext<'rc> {
+impl BlockContext {
     /// create a new `BlockContext` with default data
-    pub fn new() -> BlockContext<'rc> {
+    pub fn new() -> BlockContext {
         BlockContext::default()
     }
 
@@ -125,12 +125,12 @@ impl<'rc> BlockContext<'rc> {
     }
 
     /// Reassign the block parameters for this block.
-    pub fn set_block_params(&mut self, block_params: BlockParams<'rc>) {
+    pub fn set_block_params(&mut self, block_params: BlockParams) {
         self.block_params = block_params;
     }
 
     /// Set a block parameter into this block.
-    pub fn set_block_param(&mut self, key: &'rc str, value: BlockParamHolder) {
+    pub fn set_block_param(&mut self, key: String, value: BlockParamHolder) {
         self.block_params.data.insert(key, value);
     }
 }

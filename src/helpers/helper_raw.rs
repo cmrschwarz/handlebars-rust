@@ -8,12 +8,12 @@ use crate::render::{Helper, RenderContext, Renderable};
 pub struct RawHelper;
 
 impl HelperDef for RawHelper {
-    fn call<'reg: 'rc, 'rc>(
+    fn call<'a>(
         &self,
-        h: &Helper<'rc>,
-        r: &'reg Registry<'reg>,
-        ctx: &'rc Context,
-        rc: &mut RenderContext<'reg, 'rc>,
+        h: &'a Helper<'a>,
+        r: &'a Registry,
+        ctx: &'a Context,
+        rc: &mut RenderContext,
         out: &mut dyn Output,
     ) -> HelperResult {
         let tpl = h.template();

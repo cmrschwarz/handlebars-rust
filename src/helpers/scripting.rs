@@ -50,9 +50,9 @@ impl HelperDef for ScriptHelper {
     fn call_inner<'reg: 'rc, 'rc>(
         &self,
         h: &Helper<'rc>,
-        reg: &'reg Registry<'reg>,
+        reg: &'reg Registry,
         _ctx: &'rc Context,
-        _rc: &mut RenderContext<'reg, 'rc>,
+        _rc: &mut RenderContext,
     ) -> Result<ScopedJson<'rc>, RenderError> {
         call_script_helper(h.params(), h.hash(), &reg.engine, &self.script)
     }

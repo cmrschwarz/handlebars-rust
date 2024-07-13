@@ -257,7 +257,7 @@
 //! struct SimpleHelper;
 //!
 //! impl HelperDef for SimpleHelper {
-//!   fn call<'reg: 'rc, 'rc>(&self, h: &Helper, _: &Handlebars, _: &Context, rc: &mut RenderContext, out: &mut dyn Output) -> HelperResult {
+//!   fn call(&self, h: &Helper, _: &Handlebars, _: &Context, rc: &mut RenderContext, out: &mut dyn Output) -> HelperResult {
 //!     let param = h.param(0).unwrap();
 //!
 //!     out.write("1st helper: ")?;

@@ -57,31 +57,25 @@ pub type DecoratorResult = Result<(), RenderError>;
 /// ```
 ///
 pub trait DecoratorDef {
-    fn call<'reg: 'rc, 'rc>(
-        &'reg self,
-        d: &Decorator<'rc>,
-        r: &'reg Registry<'reg>,
-        ctx: &'rc Context,
-        rc: &mut RenderContext<'reg, 'rc>,
+    fn call<'a>(
+        &'a self,
+        d: &Decorator<'a>,
+        r: &'a Registry,
+        ctx: &'a Context,
+        rc: &mut RenderContext,
     ) -> DecoratorResult;
 }
 
-/// Implement `DecoratorDef` for bare function so we can use function as decorator
-impl<
-        F: for<'reg, 'rc> Fn(
-            &Decorator<'rc>,
-            &'reg Registry<'reg>,
-            &'rc Context,
-            &mut RenderContext<'reg, 'rc>,
-        ) -> DecoratorResult,
-    > DecoratorDef for F
+/// Implement DecoratorDef for bare function so we can use function as decorator
+impl<F: for<'a> Fn(&Decorator<'a>, &Registry, &Context, &mut RenderContext) -> DecoratorResult>
+    DecoratorDef for F
 {
-    fn call<'reg: 'rc, 'rc>(
-        &'reg self,
-        d: &Decorator<'rc>,
-        reg: &'reg Registry<'reg>,
-        ctx: &'rc Context,
-        rc: &mut RenderContext<'reg, 'rc>,
+    fn call(
+        &self,
+        d: &Decorator<'_>,
+        reg: &Registry,
+        ctx: &Context,
+        rc: &mut RenderContext,
     ) -> DecoratorResult {
         (*self)(d, reg, ctx, rc)
     }
@@ -115,9 +109,9 @@ mod test {
             "foo",
             Box::new(
                 |_: &Decorator<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  _: &Context,
-                 _: &mut RenderContext<'_, '_>|
+                 _: &mut RenderContext|
                  -> Result<(), RenderError> { Ok(()) },
             ),
         );
@@ -140,9 +134,9 @@ mod test {
             "foo",
             Box::new(
                 |_: &Decorator<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  ctx: &Context,
-                 rc: &mut RenderContext<'_, '_>|
+                 rc: &mut RenderContext|
                  -> Result<(), RenderError> {
                     // modify json object
                     let mut new_ctx = ctx.clone();
@@ -168,9 +162,9 @@ mod test {
             "bar",
             Box::new(
                 |d: &Decorator<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  _: &Context,
-                 rc: &mut RenderContext<'_, '_>|
+                 rc: &mut RenderContext|
                  -> Result<(), RenderError> {
                     // modify value
                     let v = d
@@ -221,9 +215,9 @@ mod test {
             "distance",
             Box::new(
                 |h: &Helper<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  _: &Context,
-                 _: &mut RenderContext<'_, '_>,
+                 _: &mut RenderContext,
                  out: &mut dyn Output|
                  -> Result<(), RenderError> {
                     write!(
@@ -239,9 +233,9 @@ mod test {
             "foo",
             Box::new(
                 |d: &Decorator<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  _: &Context,
-                 rc: &mut RenderContext<'_, '_>|
+                 rc: &mut RenderContext|
                  -> Result<(), RenderError> {
                     let new_unit = d
                         .param(0)
@@ -250,9 +244,9 @@ mod test {
                         .unwrap_or("")
                         .to_owned();
                     let new_helper = move |h: &Helper<'_>,
-                                           _: &Registry<'_>,
+                                           _: &Registry,
                                            _: &Context,
-                                           _: &mut RenderContext<'_, '_>,
+                                           _: &mut RenderContext,
                                            out: &mut dyn Output|
                           -> Result<(), RenderError> {
                         write!(
@@ -273,9 +267,9 @@ mod test {
             "bar",
             Box::new(
                 |_: &Decorator<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  _: &Context,
-                 rc: &mut RenderContext<'_, '_>|
+                 rc: &mut RenderContext|
                  -> Result<(), RenderError> {
                     rc.unregister_local_helper("distance");
                     Ok(())

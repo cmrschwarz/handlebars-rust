@@ -33,8 +33,8 @@ pub type HelperResult = Result<(), RenderError>;
 /// ```
 /// use handlebars::*;
 ///
-/// fn upper(h: &Helper< '_>, _: &Handlebars<'_>, _: &Context, rc:
-/// &mut RenderContext<'_, '_>, out: &mut dyn Output)
+/// fn upper(h: &Helper< '_>, _: &Handlebars, _: &Context, rc:
+/// &mut RenderContext, out: &mut dyn Output)
 ///     -> HelperResult {
 ///    // get parameter from helper or throw an error
 ///    let param = h.param(0).and_then(|v| v.value().as_str()).unwrap_or("");
@@ -50,11 +50,11 @@ pub type HelperResult = Result<(), RenderError>;
 /// ```
 /// use handlebars::*;
 ///
-/// fn dummy_block<'reg, 'rc>(
-///     h: &Helper<'rc>,
-///     r: &'reg Handlebars<'reg>,
-///     ctx: &'rc Context,
-///     rc: &mut RenderContext<'reg, 'rc>,
+/// fn dummy_block(
+///     h: &Helper<'_>,
+///     r: &Handlebars,
+///     ctx: &Context,
+///     rc: &mut RenderContext,
 ///     out: &mut dyn Output,
 /// ) -> HelperResult {
 ///     h.template()
@@ -89,13 +89,13 @@ pub trait HelperDef {
     ///
     /// Note that the value can be `json!(null)` which is treated as `false` in
     /// helpers like `if` and rendered as empty string.
-    fn call_inner<'reg: 'rc, 'rc>(
+    fn call_inner<'a>(
         &self,
-        _: &Helper<'rc>,
-        _: &'reg Registry<'reg>,
-        _: &'rc Context,
-        _: &mut RenderContext<'reg, 'rc>,
-    ) -> Result<ScopedJson<'rc>, RenderError> {
+        _: &Helper<'a>,
+        _: &'a Registry,
+        _: &'a Context,
+        _: &mut RenderContext,
+    ) -> Result<ScopedJson<'a>, RenderError> {
         Err(RenderErrorReason::Unimplemented.into())
     }
 
@@ -112,12 +112,12 @@ pub trait HelperDef {
     /// subexpression, handlebars tries to parse the string output as JSON to
     /// re-build its type. This can be buggy with numrical and other literal values.
     /// So it is not recommended to use these helpers in subexpression.
-    fn call<'reg: 'rc, 'rc>(
+    fn call(
         &self,
-        h: &Helper<'rc>,
-        r: &'reg Registry<'reg>,
-        ctx: &'rc Context,
-        rc: &mut RenderContext<'reg, 'rc>,
+        h: &Helper<'_>,
+        r: &Registry,
+        ctx: &Context,
+        rc: &mut RenderContext,
         out: &mut dyn Output,
     ) -> HelperResult {
         match self.call_inner(h, r, ctx, rc) {
@@ -147,21 +147,21 @@ pub trait HelperDef {
 
 /// implement `HelperDef` for bare function so we can use function as helper
 impl<
-        F: for<'reg, 'rc> Fn(
-            &Helper<'rc>,
-            &'reg Registry<'reg>,
-            &'rc Context,
-            &mut RenderContext<'reg, 'rc>,
-            &mut dyn Output,
+        F: for<'a> Fn(
+            &'a Helper<'a>,
+            &'a Registry,
+            &'a Context,
+            &'a mut RenderContext,
+            &'a mut dyn Output,
         ) -> HelperResult,
     > HelperDef for F
 {
-    fn call<'reg: 'rc, 'rc>(
+    fn call(
         &self,
-        h: &Helper<'rc>,
-        r: &'reg Registry<'reg>,
-        ctx: &'rc Context,
-        rc: &mut RenderContext<'reg, 'rc>,
+        h: &Helper<'_>,
+        r: &Registry,
+        ctx: &Context,
+        rc: &mut RenderContext,
         out: &mut dyn Output,
     ) -> HelperResult {
         (*self)(h, r, ctx, rc, out)
@@ -198,12 +198,12 @@ mod test {
     struct MetaHelper;
 
     impl HelperDef for MetaHelper {
-        fn call<'reg: 'rc, 'rc>(
+        fn call(
             &self,
-            h: &Helper<'rc>,
-            r: &'reg Registry<'reg>,
-            ctx: &'rc Context,
-            rc: &mut RenderContext<'reg, 'rc>,
+            h: &Helper<'_>,
+            r: &Registry,
+            ctx: &Context,
+            rc: &mut RenderContext,
             out: &mut dyn Output,
         ) -> Result<(), RenderError> {
             let v = h.param(0).unwrap();
@@ -249,9 +249,9 @@ mod test {
             "helperMissing",
             Box::new(
                 |h: &Helper<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  _: &Context,
-                 _: &mut RenderContext<'_, '_>,
+                 _: &mut RenderContext,
                  out: &mut dyn Output|
                  -> Result<(), RenderError> {
                     write!(out, "{}{}", h.name(), h.param(0).unwrap().value())?;
@@ -263,9 +263,9 @@ mod test {
             "foo",
             Box::new(
                 |h: &Helper<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  _: &Context,
-                 _: &mut RenderContext<'_, '_>,
+                 _: &mut RenderContext,
                  out: &mut dyn Output|
                  -> Result<(), RenderError> {
                     write!(out, "{}", h.hash_get("value").unwrap().value().render())?;

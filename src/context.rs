@@ -34,7 +34,7 @@ enum ResolvedPath<'a> {
 
 fn parse_json_visitor<'a>(
     relative_path: &[PathSeg],
-    block_contexts: &'a VecDeque<BlockContext<'_>>,
+    block_contexts: &'a VecDeque<BlockContext>,
     always_for_absolute_path: bool,
 ) -> ResolvedPath<'a> {
     let mut path_context_depth: usize = 0;
@@ -128,7 +128,7 @@ fn get_data<'a>(d: Option<&'a Json>, p: &str) -> Result<Option<&'a Json>, Render
 }
 
 fn get_in_block_params<'a>(
-    block_contexts: &'a VecDeque<BlockContext<'_>>,
+    block_contexts: &'a VecDeque<BlockContext>,
     p: &str,
 ) -> Option<(&'a BlockParamHolder, &'a Vec<String>)> {
     for bc in block_contexts {
@@ -171,7 +171,7 @@ impl Context {
     pub(crate) fn navigate<'rc>(
         &'rc self,
         relative_path: &[PathSeg],
-        block_contexts: &VecDeque<BlockContext<'_>>,
+        block_contexts: &VecDeque<BlockContext>,
     ) -> Result<ScopedJson<'rc>, RenderError> {
         // always use absolute at the moment until we get base_value lifetime issue fixed
         let resolved_visitor = parse_json_visitor(relative_path, block_contexts, true);
@@ -429,9 +429,9 @@ mod test {
         let ctx = Context::wraps(m).unwrap();
         let mut block_params = BlockParams::new();
         block_params
-            .add_path("z", ["0".to_owned(), "a".to_owned()].to_vec())
+            .add_path("z".into(), ["0".to_owned(), "a".to_owned()].to_vec())
             .unwrap();
-        block_params.add_value("t", json!("good")).unwrap();
+        block_params.add_value("t".into(), json!("good")).unwrap();
 
         let mut block = BlockContext::new();
         block.set_block_params(block_params);

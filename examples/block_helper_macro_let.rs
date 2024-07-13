@@ -5,11 +5,11 @@ use handlebars::{
 use serde_json::{json, Value};
 
 // a custom block helper to bind a variable name to a value
-pub fn helper_let<'reg, 'rc>(
-    h: &Helper<'rc>,
-    _r: &'reg Handlebars<'reg>,
-    _ctx: &'rc Context,
-    rc: &mut RenderContext<'reg, 'rc>,
+pub fn helper_let<'a>(
+    h: &Helper<'a>,
+    _r: &'a Handlebars,
+    _ctx: &'a Context,
+    rc: &'a mut RenderContext,
     _out: &mut dyn Output,
 ) -> Result<(), RenderError> {
     let name_param = h
@@ -33,7 +33,10 @@ pub fn helper_let<'reg, 'rc>(
 
     let block = rc.block_mut().unwrap();
 
-    block.set_block_param(name_constant, BlockParamHolder::Value(value));
+    block.set_block_param(
+        name_constant.as_str().into(),
+        BlockParamHolder::Value(value),
+    );
 
     Ok(())
 }

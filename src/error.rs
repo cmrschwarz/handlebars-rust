@@ -3,6 +3,7 @@ use std::error::Error as StdError;
 use std::fmt::{self, Write};
 use std::io::Error as IOError;
 use std::string::FromUtf8Error;
+use std::sync::Arc;
 
 use serde_json::error::Error as SerdeError;
 use thiserror::Error;
@@ -17,7 +18,7 @@ use rhai::{EvalAltResult, ParseError};
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct RenderError {
-    pub template_name: Option<String>,
+    pub template_name: Option<Arc<str>>,
     pub line_no: Option<usize>,
     pub column_no: Option<usize>,
     reason: Box<RenderErrorReason>,

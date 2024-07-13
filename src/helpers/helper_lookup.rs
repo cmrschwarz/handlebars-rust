@@ -12,13 +12,13 @@ use crate::RenderErrorReason;
 pub struct LookupHelper;
 
 impl HelperDef for LookupHelper {
-    fn call_inner<'reg: 'rc, 'rc>(
+    fn call_inner<'a>(
         &self,
-        h: &Helper<'rc>,
-        r: &'reg Registry<'reg>,
-        _: &'rc Context,
-        _: &mut RenderContext<'reg, 'rc>,
-    ) -> Result<ScopedJson<'rc>, RenderError> {
+        h: &Helper<'a>,
+        r: &'a Registry,
+        _: &'a Context,
+        _: &mut RenderContext,
+    ) -> Result<ScopedJson<'a>, RenderError> {
         let collection_value = h
             .param(0)
             .ok_or(RenderErrorReason::ParamNotFoundForIndex("lookup", 0))?;

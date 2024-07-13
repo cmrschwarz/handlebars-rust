@@ -22,7 +22,7 @@ macro_rules! define_case_helper {
             h: &crate::render::Helper<'_>,
             _: &crate::Handlebars<'_>,
             _: &crate::context::Context,
-            _rc: &mut crate::render::RenderContext<'_, '_>,
+            _rc: &mut crate::render::RenderContext,
             out: &mut dyn crate::output::Output,
         ) -> crate::helpers::HelperResult {
             let param = h.param(0).and_then(|v| v.value().as_str()).ok_or_else(|| {

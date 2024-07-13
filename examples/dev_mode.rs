@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{sync::Arc, thread};
 
 use handlebars::Handlebars;
 use serde_json::json;
 use tiny_http::{Response, Server};
 
-fn handlebars() -> Handlebars<'static> {
+fn handlebars() -> Handlebars {
     let mut reg = Handlebars::new();
     // enable dev mode for template reloading
     reg.set_dev_mode(true);
@@ -18,6 +18,9 @@ fn handlebars() -> Handlebars<'static> {
 
 fn main() {
     let hbs = Arc::new(handlebars());
+
+    let hbs2 = hbs.clone();
+    thread::spawn(move || hbs2.render_template("foo", &()));
 
     let server = Server::http("127.0.0.1:3030").expect("Failed to start demo server.");
     println!("Edit ./examples/dev_mode/template.hbs and request http://localhost:3030 to see the change on the fly.");

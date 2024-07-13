@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use serde_json::value::Value as Json;
 
@@ -16,13 +16,13 @@ use crate::RenderErrorReason;
 pub(crate) const PARTIAL_BLOCK: &str = "@partial-block";
 
 fn find_partial<'reg: 'rc, 'rc: 'a, 'a>(
-    rc: &'a RenderContext<'reg, 'rc>,
-    r: &'reg Registry<'reg>,
+    rc: &'a RenderContext,
+    r: &'reg Registry,
     d: &Decorator<'rc>,
     name: &str,
-) -> Result<Option<Cow<'a, Template>>, RenderError> {
+) -> Result<Option<Arc<Template>>, RenderError> {
     if let Some(partial) = rc.get_partial(name) {
-        return Ok(Some(Cow::Borrowed(partial)));
+        return Ok(Some(partial));
     }
 
     if let Some(tpl) = r.get_or_load_template_optional(name) {
@@ -30,17 +30,17 @@ fn find_partial<'reg: 'rc, 'rc: 'a, 'a>(
     }
 
     if let Some(tpl) = d.template() {
-        return Ok(Some(Cow::Borrowed(tpl)));
+        return Ok(Some(tpl));
     }
 
     Ok(None)
 }
 
-pub fn expand_partial<'reg: 'rc, 'rc>(
-    d: &Decorator<'rc>,
-    r: &'reg Registry<'reg>,
-    ctx: &'rc Context,
-    rc: &mut RenderContext<'reg, 'rc>,
+pub fn expand_partial(
+    d: &Decorator<'_>,
+    r: &Registry,
+    ctx: &Context,
+    rc: &mut RenderContext,
     out: &mut dyn Output,
 ) -> Result<(), RenderError> {
     // try eval inline partials first
@@ -49,114 +49,106 @@ pub fn expand_partial<'reg: 'rc, 'rc>(
     }
 
     let tname = d.name();
+
     if rc.is_current_template(tname) {
         return Err(RenderErrorReason::CannotIncludeSelf.into());
     }
 
+    let template_name_before = rc.get_current_template_name();
+    let indent_before = rc.get_indent_string().to_owned();
+
     let partial = find_partial(rc, r, d, tname)?;
 
-    if let Some(t) = partial {
-        // clone to avoid lifetime issue
-        // FIXME refactor this to avoid
-        let mut local_rc = rc.clone();
+    let Some(t) = partial else {
+        return Err(RenderErrorReason::PartialNotFound(tname.to_owned()).into());
+    };
+    // if tname == PARTIAL_BLOCK
+    let is_partial_block = tname == PARTIAL_BLOCK;
 
-        // if tname == PARTIAL_BLOCK
-        let is_partial_block = tname == PARTIAL_BLOCK;
-
-        // add partial block depth there are consecutive partial
-        // blocks in the stack.
-        if is_partial_block {
-            local_rc.inc_partial_block_depth();
-        } else {
-            // depth cannot be lower than 0, which is guaranted in the
-            // `dec_partial_block_depth` method
-            local_rc.dec_partial_block_depth();
-        }
-
-        let mut block_created = false;
-
-        // create context if param given
-        if let Some(base_path) = d.param(0).and_then(|p| p.context_path()) {
-            // path given, update base_path
-            let mut block_inner = BlockContext::new();
-            base_path.clone_into(block_inner.base_path_mut());
-
-            // because block is moved here, we need another bool variable to track
-            // its status for later cleanup
-            block_created = true;
-            // clear blocks to prevent block params from parent
-            // template to be leaked into partials
-            // see `test_partial_context_issue_495` for the case.
-            local_rc.clear_blocks();
-            local_rc.push_block(block_inner);
-        }
-
-        if !d.hash().is_empty() {
-            // hash given, update base_value
-            let hash_ctx = d
-                .hash()
-                .iter()
-                .map(|(k, v)| (*k, v.value()))
-                .collect::<HashMap<&str, &Json>>();
-
-            // create block if we didn't (no param provided for partial expression)
-            if !block_created {
-                let block_inner = if let Some(block) = local_rc.block() {
-                    // reuse current block information, including base_path and
-                    // base_value if any
-                    block.clone()
-                } else {
-                    BlockContext::new()
-                };
-
-                local_rc.clear_blocks();
-                local_rc.push_block(block_inner);
-            }
-
-            // evaluate context within current block, this includes block
-            // context provided by partial expression parameter
-            let merged_context = merge_json(
-                local_rc.evaluate2(ctx, &Path::current())?.as_json(),
-                &hash_ctx,
-            );
-
-            // update the base value, there must be a block for this so it's
-            // also safe to unwrap.
-            if let Some(block) = local_rc.block_mut() {
-                block.set_base_value(merged_context);
-            }
-        }
-
-        // @partial-block
-        if let Some(pb) = d.template() {
-            local_rc.push_partial_block(pb);
-        }
-
-        // indent
-        local_rc.set_indent_string(d.indent().cloned());
-
-        let result = t.render(r, ctx, &mut local_rc, out);
-
-        // cleanup
-
-        let trailing_newline = local_rc.get_trailine_newline();
-
-        if block_created {
-            local_rc.pop_block();
-        }
-
-        if d.template().is_some() {
-            local_rc.pop_partial_block();
-        }
-
-        drop(local_rc);
-
-        rc.set_trailing_newline(trailing_newline);
-
-        result
+    // add partial block depth there are consecutive partial
+    // blocks in the stack.
+    if is_partial_block {
+        rc.inc_partial_block_depth();
     } else {
-        Err(RenderErrorReason::PartialNotFound(tname.to_owned()).into())
+        // depth cannot be lower than 0, which is guaranted in the
+        // `dec_partial_block_depth` method
+        rc.dec_partial_block_depth();
     }
+
+    let mut block_created = false;
+
+    // create context if param given
+    if let Some(base_path) = d.param(0).and_then(|p| p.context_path()) {
+        // path given, update base_path
+        let mut block_inner = BlockContext::new();
+        *block_inner.base_path_mut() = base_path.to_vec();
+
+        // because block is moved here, we need another bool variable to track
+        // its status for later cleanup
+        block_created = true;
+        // clear blocks to prevent block params from parent
+        // template to be leaked into partials
+        // see `test_partial_context_issue_495` for the case.
+        rc.push_block(block_inner);
+    }
+
+    if !d.hash().is_empty() {
+        // hash given, update base_value
+        let hash_ctx = d
+            .hash()
+            .iter()
+            .map(|(k, v)| (*k, v.value()))
+            .collect::<HashMap<&str, &Json>>();
+
+        // create block if we didn't (no param provided for partial expression)
+        if !block_created {
+            let block_inner = if let Some(block) = rc.block() {
+                // reuse current block information, including base_path and
+                // base_value if any
+                block.clone()
+            } else {
+                BlockContext::new()
+            };
+            block_created = true;
+            rc.push_block(block_inner);
+        }
+
+        // evaluate context within current block, this includes block
+        // context provided by partial expression parameter
+        let merged_context = merge_json(rc.evaluate2(ctx, &Path::current())?.as_json(), &hash_ctx);
+
+        // update the base value, there must be a block for this so it's
+        // also safe to unwrap.
+        if let Some(block) = rc.block_mut() {
+            block.set_base_value(merged_context);
+        }
+    }
+
+    // @partial-block
+    if let Some(pb) = d.template() {
+        rc.push_partial_block(pb);
+    }
+
+    // indent
+    rc.set_indent_string(d.indent());
+
+    let result = t.render(r, ctx, rc, out);
+
+    // cleanup
+
+    if d.template().is_some() {
+        rc.pop_partial_block();
+    }
+
+    if block_created {
+        rc.pop_block();
+    }
+
+    rc.set_current_template_name(template_name_before);
+
+    rc.set_indent_string(&indent_before);
+
+    result
 }
 
 #[cfg(test)]
@@ -321,9 +313,9 @@ mod test {
             "x",
             Box::new(
                 |_: &Helper<'_>,
-                 _: &Registry<'_>,
+                 _: &Registry,
                  _: &Context,
-                 _: &mut RenderContext<'_, '_>,
+                 _: &mut RenderContext,
                  out: &mut dyn Output|
                  -> Result<(), RenderError> {
                     out.write("two")?;

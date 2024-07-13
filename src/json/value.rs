@@ -104,6 +104,15 @@ impl<'rc> PathAndJson<'rc> {
     pub fn render(&self) -> String {
         self.value.render()
     }
+
+    pub fn into_static(self) -> PathAndJson<'static> {
+        match self.value {
+            ScopedJson::Constant(_) => todo!(),
+            ScopedJson::Derived(_) => todo!(),
+            ScopedJson::Context(_, _) => todo!(),
+            ScopedJson::Missing => todo!(),
+        }
+    }
 }
 
 /// Render Json data with default format

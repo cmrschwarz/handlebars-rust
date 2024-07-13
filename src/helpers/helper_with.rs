@@ -13,12 +13,12 @@ use crate::RenderErrorReason;
 pub struct WithHelper;
 
 impl HelperDef for WithHelper {
-    fn call<'reg: 'rc, 'rc>(
+    fn call(
         &self,
-        h: &Helper<'rc>,
-        r: &'reg Registry<'reg>,
-        ctx: &'rc Context,
-        rc: &mut RenderContext<'reg, 'rc>,
+        h: &Helper<'_>,
+        r: &Registry,
+        ctx: &Context,
+        rc: &mut RenderContext,
         out: &mut dyn Output,
     ) -> HelperResult {
         let param = h
@@ -31,9 +31,9 @@ impl HelperDef for WithHelper {
             if let Some(block_param) = h.block_param() {
                 let mut params = BlockParams::new();
                 if param.context_path().is_some() {
-                    params.add_path(block_param, Vec::with_capacity(0))?;
+                    params.add_path(block_param.to_owned(), Vec::with_capacity(0))?;
                 } else {
-                    params.add_value(block_param, param.value().clone())?;
+                    params.add_value(block_param.to_owned(), param.value().clone())?;
                 }
 
                 block.set_block_params(params);

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::iter::Peekable;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use pest::error::LineColLocation;
 use pest::iterators::Pair;
@@ -25,7 +26,7 @@ pub struct TemplateMapping(pub usize, pub usize);
 #[non_exhaustive]
 #[derive(PartialEq, Eq, Clone, Debug, Default)]
 pub struct Template {
-    pub name: Option<String>,
+    pub name: Option<Arc<str>>,
     pub elements: Vec<TemplateElement>,
     pub mapping: Vec<TemplateMapping>,
 }
@@ -34,12 +35,15 @@ pub struct Template {
 pub(crate) struct TemplateOptions {
     pub(crate) prevent_indent: bool,
     pub(crate) is_partial: bool,
-    pub(crate) name: Option<String>,
+    pub(crate) name: Option<Arc<str>>,
 }
 
 impl TemplateOptions {
     fn name(&self) -> String {
-        self.name.clone().unwrap_or_else(|| "Unnamed".to_owned())
+        self.name
+            .as_ref()
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "Unnamed".to_owned())
     }
 }
 
@@ -282,9 +286,9 @@ pub struct DecoratorTemplate {
     pub name: Parameter,
     pub params: Vec<Parameter>,
     pub hash: HashMap<String, Parameter>,
-    pub template: Option<Template>,
+    pub template: Option<Arc<Template>>,
     // for partial indent
-    pub indent: Option<String>,
+    pub indent: String,
     pub(crate) indent_before_write: bool,
 }
 
@@ -295,7 +299,7 @@ impl DecoratorTemplate {
             params: exp.params,
             hash: exp.hash,
             template: None,
-            indent: None,
+            indent: String::new(),
             indent_before_write,
         }
     }
@@ -366,7 +370,7 @@ impl Template {
         let name_span = name_node.as_span();
         match rule {
             Rule::identifier | Rule::partial_identifier | Rule::invert_tag_item => {
-                Ok(Parameter::Name(name_span.as_str().to_owned()))
+                Ok(Parameter::Name(name_span.as_str().into()))
             }
             Rule::reference => {
                 let paths = parse_json_path_from_iter(it, name_span.end());
@@ -469,12 +473,12 @@ impl Template {
         let p1_name = it.next().unwrap();
         let p1_name_span = p1_name.as_span();
         // identifier
-        let p1 = p1_name_span.as_str().to_owned();
+        let p1 = p1_name_span.as_str().into();
 
         let p2 = it.peek().and_then(|p2_name| {
             let p2_name_span = p2_name.as_span();
             if p2_name_span.end() <= limit {
-                Some(p2_name_span.as_str().to_owned())
+                Some(p2_name_span.as_str().into())
             } else {
                 None
             }
@@ -911,7 +915,7 @@ impl Template {
                                     exp.clone(),
                                     trim_line_required && !exp.omit_pre_ws,
                                 );
-                                decorator.indent = indent.map(std::borrow::ToOwned::to_owned);
+                                decorator.indent = indent.map(str::to_owned).unwrap_or_default();
 
                                 let el = if rule == Rule::decorator_expression {
                                     DecoratorExpression(Box::new(decorator))
@@ -966,7 +970,7 @@ impl Template {
                                 let close_tag_name = exp.name.as_name();
                                 if d.name.as_name() == close_tag_name {
                                     let prev_t = template_stack.pop_front().unwrap();
-                                    d.template = Some(prev_t);
+                                    d.template = Some(Arc::new(prev_t));
                                     let t = template_stack.front_mut().unwrap();
                                     if rule == Rule::decorator_block_end {
                                         t.elements.push(DecoratorBlock(Box::new(d)));
@@ -1051,7 +1055,7 @@ impl Template {
 
     pub fn compile_with_name<S: AsRef<str>>(
         source: S,
-        name: String,
+        name: Arc<str>,
     ) -> Result<Template, TemplateError> {
         Self::compile2(
             source.as_ref(),
@@ -1399,7 +1403,7 @@ mod test {
             Ok(t) => {
                 if let HelperBlock(ref ht) = t.elements[0] {
                     if let Some(BlockParam::Single(Parameter::Name(ref n))) = ht.block_param {
-                        assert_eq!(n, "person");
+                        assert_eq!(&**n, "person");
                     } else {
                         panic!("block param expected.")
                     }
@@ -1418,8 +1422,8 @@ mod test {
                         Parameter::Name(ref n2),
                     ))) = ht.block_param
                     {
-                        assert_eq!(n1, "val");
-                        assert_eq!(n2, "key");
+                        assert_eq!(&**n1, "val");
+                        assert_eq!(&**n2, "key");
                     } else {
                         panic!("helper block param expected.");
                     }
@@ -1457,7 +1461,7 @@ mod test {
             Err(e) => panic!("{}", e),
             Ok(t) => {
                 if let DecoratorBlock(ref db) = t.elements[0] {
-                    assert_eq!(db.name, Parameter::Name("inline".to_owned()));
+                    assert_eq!(db.name, Parameter::Name("inline".into()));
                     assert_eq!(
                         db.params[0],
                         Parameter::Literal(Json::String("hello".to_owned()))
@@ -1474,7 +1478,7 @@ mod test {
             Err(e) => panic!("{}", e),
             Ok(t) => {
                 if let PartialBlock(ref db) = t.elements[0] {
-                    assert_eq!(db.name, Parameter::Name("layout".to_owned()));
+                    assert_eq!(db.name, Parameter::Name("layout".into()));
                     assert_eq!(
                         db.params[0],
                         Parameter::Literal(Json::String("hello".to_owned()))

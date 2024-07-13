@@ -48,13 +48,13 @@ macro_rules! handlebars_helper {
 
         impl $crate::HelperDef for $struct_name {
             #[allow(unused_assignments)]
-            fn call_inner<'reg: 'rc, 'rc>(
+            fn call_inner<'a>(
                 &self,
-                h: &$crate::Helper<'rc>,
-                r: &'reg $crate::Handlebars<'reg>,
-                _: &'rc $crate::Context,
-                _: &mut $crate::RenderContext<'reg, 'rc>,
-            ) -> std::result::Result<$crate::ScopedJson<'rc>, $crate::RenderError> {
+                h: &$crate::Helper<'a>,
+                r: &'a $crate::Handlebars,
+                _: &'a $crate::Context,
+                _: &mut $crate::RenderContext,
+            ) -> std::result::Result<$crate::ScopedJson<'a>, $crate::RenderError> {
                 let mut param_idx = 0;
 
                 $(
